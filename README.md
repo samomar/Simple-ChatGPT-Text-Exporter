@@ -2,16 +2,17 @@
 
 ## Overview
 
-This Tampermonkey script enhances the ChatGPT web interface by adding a text export functionality. It allows users to easily copy the entire chat conversation, including both user and assistant messages.
+This Tampermonkey script enhances the ChatGPT web interface by adding a text export functionality. It allows users to easily copy the entire chat conversation, including both user and assistant messages, with proper formatting and real-time updates.
 
 ## Features
 
 - Automatically detects and logs chat messages
-- Dynamically updates as new messages appear
+- Dynamically updates the content of existing messages in real-time
 - Provides a user-friendly interface for selecting the chat container
-- Includes a "Copy Chat" button for quick export
+- Includes a "Copy Chat" button for quick export of the most up-to-date conversation
 - Persists chat container selection across page reloads
 - Adapts to URL changes within ChatGPT
+- Maintains proper formatting and line breaks in exported text
 
 ## Installation
 
@@ -20,7 +21,9 @@ This Tampermonkey script enhances the ChatGPT web interface by adding a text exp
    - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/)
    - [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
 
-2. Click [here](https://github.com/samomar/Simple-ChatGPT-Text-Exporter/raw/refs/heads/main/simple_chatgpt_text_exporter.user.js) to install the script
+2. Install the script:
+   - [Install from GitHub](https://github.com/samomar/Simple-ChatGPT-Text-Exporter/raw/refs/heads/main/simple_chatgpt_text_exporter.user.js)
+   - [Install from Greasy Fork](https://greasyfork.org/en/scripts/512815-smiple-chatgpt-text-exporter)
 
 3. Tampermonkey will open a new tab with the script contents and an "Install" button. Click "Install" to proceed.
 
@@ -32,11 +35,15 @@ This Tampermonkey script enhances the ChatGPT web interface by adding a text exp
 
 2. Look for the control panel at the top center of the page
 
-3. Select the appropriate chat container from the dropdown menu
+3. Click the "Select Chat" button to show the dropdown menu
 
-4. Start or continue your ChatGPT conversation 
+4. Select the appropriate chat container from the dropdown menu
 
-5. Click the "Copy Chat" button to copy the entire conversation to your clipboard
+5. Start or continue your ChatGPT conversation 
+
+6. Click the "Copy Chat" button to copy the entire conversation to your clipboard
+
+7. The script continuously updates the content of existing messages, ensuring that when you click "Copy Chat", you get the most current version of the conversation
 
 ## Configuration
 
@@ -52,6 +59,7 @@ If the script doesn't work as expected:
 1. Ensure you've selected the correct chat container from the dropdown
 2. Try refreshing the page and selecting a different container
 3. Check the browser console for any error messages
+4. If you notice that message updates are not being captured, try clicking the "Copy Chat" button again to get the latest content
 
 ## Contributing
 
