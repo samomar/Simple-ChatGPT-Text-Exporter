@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.6
+// @version      3.7
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -31,25 +31,28 @@
         CONFIG.chatContainerSelector = localStorage.getItem('chatContainerSelector') || '';
         CONFIG.position = localStorage.getItem('chatLoggerPosition') || 'bottom';
 
-        const waitForInputBox = setInterval(() => {
+        // Use MutationObserver to detect DOM changes
+        const bodyObserver = new MutationObserver(() => {
+            if (document.querySelector('#chat-logger-controls')) return;
             const inputBox = findInputBox();
             if (inputBox) {
-                clearInterval(waitForInputBox);
                 createControls();
-
                 if (CONFIG.chatContainerSelector) {
                     observeChatContainer(CONFIG.chatContainerSelector);
                 }
-
-                // Add this new MutationObserver to detect new chats
-                const bodyObserver = new MutationObserver(() => {
-                    if (location.href !== lastUrl) {
-                        checkUrlChange();
-                    }
-                });
-                bodyObserver.observe(document.body, { childList: true, subtree: true });
             }
-        }, 1000);
+        });
+
+        bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Initial creation of controls
+        const inputBox = findInputBox();
+        if (inputBox) {
+            createControls();
+            if (CONFIG.chatContainerSelector) {
+                observeChatContainer(CONFIG.chatContainerSelector);
+            }
+        }
 
         setInterval(checkUrlChange, 1000);
     }
@@ -163,6 +166,9 @@
             borderRadius: '4px',
             display: 'flex',
             alignItems: 'center',
+            padding: '3px 6px',
+            fontSize: '12px',
+            gap: '4px',
         };
 
         if (CONFIG.position === 'top') {
@@ -172,9 +178,6 @@
                 top: '10px',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                padding: '3px 6px',
-                fontSize: '12px',
-                gap: '4px',
             });
         } else {
             Object.assign(container.style, {
@@ -182,9 +185,6 @@
                 position: 'relative',
                 marginBottom: '5px',
                 width: 'fit-content',
-                padding: '1px 3px',
-                fontSize: '10px',
-                gap: '1px',
             });
         }
     }
@@ -391,12 +391,21 @@
             'form div.relative',
             'div[role="presentation"]',
             'div.flex.flex-col.w-full.py-2.flex-grow.md\\:py-3.md\\:pl-4',
-            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4'
+            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4',
+            // Add more selectors if needed
         ];
 
         for (let selector of possibleSelectors) {
             const element = document.querySelector(selector);
             if (element) return element;
+        }
+
+        // If no specific selector matches, try to find a general input area
+        const possibleInputAreas = document.querySelectorAll('div[class*="input"], div[class*="chat"], div[class*="message"]');
+        for (let area of possibleInputAreas) {
+            if (area.offsetHeight > 0 && area.offsetWidth > 0) {
+                return area;
+            }
         }
 
         return null;
