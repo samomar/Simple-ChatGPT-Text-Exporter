@@ -26,30 +26,19 @@
 
     /***** Initialization *****/
     function init() {
-        // Load selector from localStorage if available
-        if (!CONFIG.chatContainerSelector) {
-            CONFIG.chatContainerSelector = localStorage.getItem('chatContainerSelector') || '';
-        }
-
-        // Create UI controls
+        CONFIG.chatContainerSelector = localStorage.getItem('chatContainerSelector') || '';
         createControls();
-
-        // Start observing if a selector is set
         if (CONFIG.chatContainerSelector) {
             observeChatContainer(CONFIG.chatContainerSelector);
         }
-
-        // Monitor URL changes
         setInterval(checkUrlChange, 1000);
     }
 
     /***** UI Creation *****/
     function createControls() {
-        // Remove existing controls
         const existingControls = document.getElementById('chat-logger-controls');
         if (existingControls) existingControls.remove();
 
-        // Create container
         const container = document.createElement('div');
         container.id = 'chat-logger-controls';
         Object.assign(container.style, {
@@ -69,70 +58,31 @@
             alignItems: 'center',
         });
 
-        // Create label
-        const label = document.createElement('label');
-        label.innerText = 'Chat Container: ';
-        label.style.marginRight = '5px';
-        container.appendChild(label);
+        container.innerHTML = `
+            <div id="chat-selector-container" style="display:none;">
+                <label style="margin-right:5px;">Chat Container: </label>
+                <select id="chat-container-dropdown" style="background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; padding:2px 5px; font-size:12px;"></select>
+            </div>
+            <button id="toggle-selector-button" style="margin-right:10px; padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Select Chat</button>
+            <button id="copy-chat-button" style="padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Copy Chat</button>
+        `;
 
-        // Create dropdown
-        const select = document.createElement('select');
-        select.id = 'chat-container-dropdown';
-        Object.assign(select.style, {
-            backgroundColor: '#fff',
-            color: '#000',
-            border: '1px solid #ccc',
-            borderRadius: '3px',
-            padding: '2px 5px',
-            fontSize: '12px',
-        });
-        select.addEventListener('change', onSelectChange);
-        container.appendChild(select);
-
-        // Create copy button
-        const copyButton = document.createElement('button');
-        copyButton.id = 'copy-chat-button';
-        copyButton.innerText = 'Copy Chat';
-        Object.assign(copyButton.style, {
-            marginLeft: '10px',
-            padding: '2px 5px',
-            fontSize: '12px',
-            backgroundColor: '#fff',
-            color: '#000',
-            border: '1px solid #ccc',
-            borderRadius: '3px',
-            cursor: 'pointer',
-        });
-        copyButton.addEventListener('click', onCopyButtonClick);
-        container.appendChild(copyButton);
-
-        // Add container to body
         document.body.appendChild(container);
 
-        // Populate dropdown
+        const select = document.getElementById('chat-container-dropdown');
+        select.addEventListener('change', onSelectChange);
+        document.getElementById('toggle-selector-button').addEventListener('click', toggleSelectorVisibility);
+        document.getElementById('copy-chat-button').addEventListener('click', onCopyButtonClick);
+
         populateDropdown(select);
     }
 
     function populateDropdown(select) {
-        // Clear existing options
-        select.innerHTML = '';
+        select.innerHTML = '<option value="">-- Select --</option>' +
+            findPossibleChatContainers().map(item =>
+                `<option value="${item.selector}">${item.description}</option>`
+            ).join('');
 
-        // Add default option
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.innerText = '-- Select --';
-        select.appendChild(defaultOption);
-
-        // Get possible containers
-        const possibleContainers = findPossibleChatContainers();
-        possibleContainers.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.selector;
-            option.innerText = item.description;
-            select.appendChild(option);
-        });
-
-        // Set selected value if available
         if (CONFIG.chatContainerSelector) {
             select.value = CONFIG.chatContainerSelector;
         }
@@ -239,19 +189,20 @@
             'section'
         ];
 
-        const containers = [];
+        const containers = new Map();
         selectors.forEach(selector => {
             document.querySelectorAll(selector).forEach(el => {
-                const description = buildElementDescription(el, selector);
-                containers.push({
-                    selector: getUniqueSelector(el),
-                    description: description
-                });
+                const uniqueSelector = getUniqueSelector(el);
+                if (!containers.has(uniqueSelector)) {
+                    containers.set(uniqueSelector, {
+                        selector: uniqueSelector,
+                        description: buildElementDescription(el, selector)
+                    });
+                }
             });
         });
 
-        // Remove duplicates
-        return Array.from(new Map(containers.map(item => [item.selector, item])).values());
+        return Array.from(containers.values());
     }
 
     function buildElementDescription(el, selector) {
@@ -272,4 +223,16 @@
 
     /***** Start Script *****/
     window.addEventListener('load', init);
+
+    function toggleSelectorVisibility() {
+        const selectorContainer = document.getElementById('chat-selector-container');
+        const toggleButton = document.getElementById('toggle-selector-button');
+        if (selectorContainer.style.display === 'none') {
+            selectorContainer.style.display = 'block';
+            toggleButton.innerText = 'Hide Selector';
+        } else {
+            selectorContainer.style.display = 'none';
+            toggleButton.innerText = 'Select Chat';
+        }
+    }
 })();
