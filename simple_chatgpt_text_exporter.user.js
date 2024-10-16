@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.5
+// @version      3.6
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
