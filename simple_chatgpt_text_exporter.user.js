@@ -142,20 +142,31 @@
 
     function scanChatContent(container) {
         const messageElements = container.querySelectorAll('[data-message-author-role]');
-        messageElements.forEach(el => {
-            if (!scannedMessages.has(el)) {
-                const role = el.getAttribute('data-message-author-role');
-                const textElement = el.querySelector('.text-message') || el;
-                const text = textElement.innerText.trim();
+        let updatedMessages = [];
 
-                if (text) {
-                    let formattedMessage = `${role === 'user' ? 'You' : 'Assistant'} said:\n${text}`;
-                    if (CONFIG.enableLogging) console.log(formattedMessage);
-                    chatMessages.push(formattedMessage);
-                    scannedMessages.add(el);
+        messageElements.forEach((el, index) => {
+            const role = el.getAttribute('data-message-author-role');
+            const textElement = el.querySelector('.text-message') || el;
+            const text = textElement.innerText.trim();
+
+            if (text) {
+                let formattedMessage = `${role === 'user' ? 'You' : 'Assistant'} said:\n${text}`;
+                if (CONFIG.enableLogging) console.log(formattedMessage);
+
+                if (index < chatMessages.length) {
+                    // Update existing message
+                    updatedMessages.push(formattedMessage);
+                } else {
+                    // Add new message
+                    updatedMessages.push(formattedMessage);
                 }
+
+                scannedMessages.add(el);
             }
         });
+
+        // Update chatMessages with the new content
+        chatMessages = updatedMessages;
     }
 
     function resetChatData() {
