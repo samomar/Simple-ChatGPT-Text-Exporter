@@ -146,7 +146,7 @@
             if (!scannedMessages.has(el)) {
                 const role = el.getAttribute('data-message-author-role');
                 const textElement = el.querySelector('.text-message') || el;
-                const text = textElement.innerText.trim();
+                const text = textElement.textContent.trim();
 
                 if (text) {
                     let formattedMessage = `${role === 'user' ? 'You' : 'Assistant'} said:\n${text}`;
