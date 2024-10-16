@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Smiple ChatGPT text exporter
 // @namespace    https://chatgpt.com/
-// @version      3.2
+// @version      3.3
 // @description  Logs chat ChatGPT messages with labels, dynamically updates, and includes a copy button. UI is centered at the top.
 // @match        *://*chatgpt.com/*
 // @grant        none
+// @downloadURL https://update.greasyfork.org/scripts/512815/Smiple%20ChatGPT%20text%20exporter.user.js
+// @updateURL https://update.greasyfork.org/scripts/512815/Smiple%20ChatGPT%20text%20exporter.meta.js
 // ==/UserScript==
 
 (function() {
@@ -62,9 +64,17 @@
             <div id="chat-selector-container" style="display:none;">
                 <label style="margin-right:5px;">Chat Container: </label>
                 <select id="chat-container-dropdown" style="background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; padding:2px 5px; font-size:12px;"></select>
+                <button id="copy-selector-button" style="margin-left:5px; padding:0 3px; font-size:10px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">📋</button>
             </div>
             <button id="toggle-selector-button" style="margin-right:10px; padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Select Chat</button>
             <button id="copy-chat-button" style="padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Copy Chat</button>
+            <div class="dropdown" style="display:inline-block; position:relative;">
+                <button id="download-chat-button" style="padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">⬇️</button>
+                <div class="dropdown-content" style="display:none; position:absolute; background-color:#f9f9f9; min-width:100px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2); z-index:1;">
+                    <a href="#" id="download-txt" style="color:black; padding:12px 16px; text-decoration:none; display:block;">Download TXT</a>
+                    <a href="#" id="download-json" style="color:black; padding:12px 16px; text-decoration:none; display:block;">Download JSON</a>
+                </div>
+            </div>
         `;
 
         document.body.appendChild(container);
@@ -73,6 +83,12 @@
         select.addEventListener('change', onSelectChange);
         document.getElementById('toggle-selector-button').addEventListener('click', toggleSelectorVisibility);
         document.getElementById('copy-chat-button').addEventListener('click', onCopyButtonClick);
+        document.getElementById('download-chat-button').addEventListener('click', toggleDownloadOptions);
+        document.getElementById('download-txt').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('txt'); });
+        document.getElementById('download-json').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('json'); });
+        document.getElementById('copy-selector-button').addEventListener('click', copySelectorToClipboard);
+
+        document.addEventListener('click', closeDropdowns);
 
         populateDropdown(select);
     }
@@ -235,15 +251,57 @@
     /***** Start Script *****/
     window.addEventListener('load', init);
 
-    function toggleSelectorVisibility() {
+    function toggleSelectorVisibility(event) {
+        event.stopPropagation();
         const selectorContainer = document.getElementById('chat-selector-container');
-        const toggleButton = document.getElementById('toggle-selector-button');
-        if (selectorContainer.style.display === 'none') {
-            selectorContainer.style.display = 'block';
-            toggleButton.innerText = 'Hide Selector';
-        } else {
-            selectorContainer.style.display = 'none';
-            toggleButton.innerText = 'Select Chat';
+        selectorContainer.style.display = selectorContainer.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleDownloadOptions(event) {
+        event.stopPropagation(); // Prevent the click from immediately closing the dropdown
+        const dropdownContent = document.querySelector('.dropdown-content');
+        dropdownContent.style.display = dropdownContent.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function closeDropdowns() {
+        const dropdowns = document.querySelectorAll('.dropdown-content');
+        dropdowns.forEach(dropdown => {
+            dropdown.style.display = 'none';
+        });
+
+        const chatSelector = document.getElementById('chat-selector-container');
+        if (chatSelector) {
+            chatSelector.style.display = 'none';
         }
+    }
+
+    function downloadChat(format) {
+        const content = chatMessages.join('\n\n');
+        let blob, filename;
+
+        if (format === 'txt') {
+            blob = new Blob([content], {type: 'text/plain'});
+            filename = 'chat_export.txt';
+        } else if (format === 'json') {
+            const jsonContent = JSON.stringify(chatMessages, null, 2);
+            blob = new Blob([jsonContent], {type: 'application/json'});
+            filename = 'chat_export.json';
+        }
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function copySelectorToClipboard() {
+        const select = document.getElementById('chat-container-dropdown');
+        const selectorText = select.value;
+        navigator.clipboard.writeText(selectorText).then(() => {
+            alert('Selector copied to clipboard!');
+        }, () => {
+            alert('Failed to copy selector');
+        });
     }
 })();
