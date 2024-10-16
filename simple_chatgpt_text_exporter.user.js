@@ -40,6 +40,14 @@
                 if (CONFIG.chatContainerSelector) {
                     observeChatContainer(CONFIG.chatContainerSelector);
                 }
+
+                // Add this new MutationObserver to detect new chats
+                const bodyObserver = new MutationObserver(() => {
+                    if (location.href !== lastUrl) {
+                        checkUrlChange();
+                    }
+                });
+                bodyObserver.observe(document.body, { childList: true, subtree: true });
             }
         }, 1000);
 
@@ -150,23 +158,23 @@
             zIndex: '9999',
             backgroundColor: 'rgba(0, 0, 0, 0.3)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            padding: '1px 3px',
-            fontSize: '10px',
             fontFamily: 'Arial, sans-serif',
             color: '#fff',
             borderRadius: '4px',
             display: 'flex',
             alignItems: 'center',
-            gap: '1px',
         };
 
         if (CONFIG.position === 'top') {
             Object.assign(container.style, {
                 ...commonStyles,
                 position: 'fixed',
-                top: '5px',
+                top: '10px',
                 left: '50%',
                 transform: 'translateX(-50%)',
+                padding: '3px 6px',
+                fontSize: '12px',
+                gap: '4px',
             });
         } else {
             Object.assign(container.style, {
@@ -174,6 +182,9 @@
                 position: 'relative',
                 marginBottom: '5px',
                 width: 'fit-content',
+                padding: '1px 3px',
+                fontSize: '10px',
+                gap: '1px',
             });
         }
     }
@@ -239,17 +250,17 @@
     function observeChatContainer(selector) {
         if (observer) observer.disconnect();
 
-        const chatContainer = document.querySelector(selector);
-        if (!chatContainer) {
-            console.warn('Selected chat container not found.');
-            return;
-        }
+        const findContainer = setInterval(() => {
+            const chatContainer = document.querySelector(selector);
+            if (chatContainer) {
+                clearInterval(findContainer);
+                resetChatData();
+                scanChatContent(chatContainer);
 
-        resetChatData();
-        scanChatContent(chatContainer);
-
-        observer = new MutationObserver(() => scanChatContent(chatContainer));
-        observer.observe(chatContainer, { childList: true, subtree: true });
+                observer = new MutationObserver(() => scanChatContent(chatContainer));
+                observer.observe(chatContainer, { childList: true, subtree: true });
+            }
+        }, 500);
     }
 
     function scanChatContent(container) {
