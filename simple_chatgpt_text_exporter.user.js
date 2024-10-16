@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.4
-// @description  Logs chat ChatGPT messages with labels, dynamically updates, and includes a copy button. UI is centered at the top.
+// @version      3.5
+// @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
 // @downloadURL  https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.user.js
@@ -18,6 +18,7 @@
     const CONFIG = {
         enableLogging: false,
         chatContainerSelector: '',
+        position: 'bottom' // Default to bottom (above input box)
     };
 
     /***** Variables *****/
@@ -28,10 +29,20 @@
     /***** Initialization *****/
     function init() {
         CONFIG.chatContainerSelector = localStorage.getItem('chatContainerSelector') || '';
-        createControls();
-        if (CONFIG.chatContainerSelector) {
-            observeChatContainer(CONFIG.chatContainerSelector);
-        }
+        CONFIG.position = localStorage.getItem('chatLoggerPosition') || 'bottom';
+
+        const waitForInputBox = setInterval(() => {
+            const inputBox = findInputBox();
+            if (inputBox) {
+                clearInterval(waitForInputBox);
+                createControls();
+
+                if (CONFIG.chatContainerSelector) {
+                    observeChatContainer(CONFIG.chatContainerSelector);
+                }
+            }
+        }, 1000);
+
         setInterval(checkUrlChange, 1000);
     }
 
@@ -42,41 +53,75 @@
 
         const container = document.createElement('div');
         container.id = 'chat-logger-controls';
-        Object.assign(container.style, {
-            position: 'fixed',
-            top: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: '9999',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            border: '1px solid #ccc',
-            padding: '5px',
-            fontSize: '12px',
-            fontFamily: 'Arial, sans-serif',
-            color: '#fff',
-            borderRadius: '5px',
-            display: 'flex',
-            alignItems: 'center',
-        });
+
+        updateControlsStyle(container);
 
         container.innerHTML = `
-            <button id="toggle-selector-button" style="margin-right:5px; padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">⚙️</button>
-            <div class="dropdown" style="display:inline-block; position:relative; margin-right:5px;">
-                <button id="download-chat-button" style="padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">⬇️</button>
-                <div class="dropdown-content" style="display:none; position:absolute; background-color:#1c1c1c; min-width:120px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.5); z-index:1; border-radius:3px; overflow:hidden;">
-                    <a href="#" id="download-txt" style="color:#fff; padding:8px 12px; text-decoration:none; display:block; font-size:12px; transition:background-color 0.3s;">Download TXT</a>
-                    <a href="#" id="download-json" style="color:#fff; padding:8px 12px; text-decoration:none; display:block; font-size:12px; transition:background-color 0.3s;">Download JSON</a>
+            <button id="toggle-selector-button" class="chat-logger-btn">⚙️</button>
+            <div class="dropdown" style="display:inline-block; position:relative;">
+                <button id="download-chat-button" class="chat-logger-btn">⬇️</button>
+                <div class="dropdown-content" style="display:none; position:absolute; background-color:#1c1c1c; min-width:100px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.5); z-index:1; border-radius:4px; overflow:hidden; bottom:100%; left:0;">
+                    <a href="#" id="download-txt" class="dropdown-item">Download TXT</a>
+                    <a href="#" id="download-json" class="dropdown-item">Download JSON</a>
                 </div>
             </div>
-            <button id="copy-chat-button" style="margin-right:5px; padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">Copy Chat</button>
-            <div id="chat-selector-container" style="display:none; margin-right: 5px;">
-                <label style="margin-right:3px;">Chat Container: </label>
-                <select id="chat-container-dropdown" style="background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; padding:2px 5px; font-size:12px;"></select>
-                <button id="copy-selector-button" style="margin-left:3px; padding:0 3px; font-size:10px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">📋</button>
+            <button id="copy-chat-button" class="chat-logger-btn">Copy</button>
+            <button id="toggle-position-button" class="chat-logger-btn">↕️</button>
+            <div id="chat-selector-container" style="display:none;">
+                <select id="chat-container-dropdown" class="chat-logger-select"></select>
+                <button id="copy-selector-button" class="chat-logger-btn">📋</button>
             </div>
         `;
 
-        document.body.appendChild(container);
+        const style = document.createElement('style');
+        style.textContent = `
+            .chat-logger-btn {
+                padding: 1px 3px;
+                font-size: 10px;
+                background-color: transparent;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 0 1px;
+            }
+            .chat-logger-btn:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            .chat-logger-select {
+                background-color: transparent;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                padding: 1px 3px;
+                font-size: 10px;
+                margin: 0 1px;
+            }
+            .dropdown-item {
+                color: #fff;
+                padding: 4px 6px;
+                text-decoration: none;
+                display: block;
+                font-size: 10px;
+                transition: background-color 0.3s;
+            }
+            .dropdown-item:hover {
+                background-color: #3c3c3c;
+            }
+        `;
+        document.head.appendChild(style);
+
+        if (CONFIG.position === 'top') {
+            document.body.insertBefore(container, document.body.firstChild);
+        } else {
+            const inputBox = findInputBox();
+            if (inputBox) {
+                inputBox.parentElement.insertBefore(container, inputBox);
+            } else {
+                console.warn('Input box not found. Appending to body.');
+                document.body.appendChild(container);
+            }
+        }
 
         const select = document.getElementById('chat-container-dropdown');
         select.addEventListener('change', onSelectChange);
@@ -86,6 +131,7 @@
         document.getElementById('download-txt').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('txt'); });
         document.getElementById('download-json').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('json'); });
         document.getElementById('copy-selector-button').addEventListener('click', copySelectorToClipboard);
+        document.getElementById('toggle-position-button').addEventListener('click', togglePosition);
 
         document.addEventListener('click', closeDropdowns);
 
@@ -97,6 +143,45 @@
             item.addEventListener('mouseover', () => item.style.backgroundColor = '#3c3c3c');
             item.addEventListener('mouseout', () => item.style.backgroundColor = 'transparent');
         });
+    }
+
+    function updateControlsStyle(container) {
+        const commonStyles = {
+            zIndex: '9999',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '1px 3px',
+            fontSize: '10px',
+            fontFamily: 'Arial, sans-serif',
+            color: '#fff',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1px',
+        };
+
+        if (CONFIG.position === 'top') {
+            Object.assign(container.style, {
+                ...commonStyles,
+                position: 'fixed',
+                top: '5px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+            });
+        } else {
+            Object.assign(container.style, {
+                ...commonStyles,
+                position: 'relative',
+                marginBottom: '5px',
+                width: 'fit-content',
+            });
+        }
+    }
+
+    function togglePosition() {
+        CONFIG.position = CONFIG.position === 'top' ? 'bottom' : 'top';
+        localStorage.setItem('chatLoggerPosition', CONFIG.position);
+        createControls(); // Recreate controls with new position
     }
 
     function populateDropdown(select) {
@@ -287,4 +372,22 @@
     window.closeDropdowns = closeDropdowns;
     window.downloadChat = downloadChat;
     window.copySelectorToClipboard = copySelectorToClipboard;
+    window.togglePosition = togglePosition;
+
+    function findInputBox() {
+        const possibleSelectors = [
+            'div.group.relative.flex.w-full.items-center',
+            'form div.relative',
+            'div[role="presentation"]',
+            'div.flex.flex-col.w-full.py-2.flex-grow.md\\:py-3.md\\:pl-4',
+            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4'
+        ];
+
+        for (let selector of possibleSelectors) {
+            const element = document.querySelector(selector);
+            if (element) return element;
+        }
+
+        return null;
+    }
 })();
