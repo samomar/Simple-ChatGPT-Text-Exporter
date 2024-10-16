@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Tampermonkey script enhances the ChatGPT web interface by adding a text export functionality. It allows users to easily copy the entire chat conversation, including both user and assistant messages, with proper formatting and real-time updates.
+This Tampermonkey script enhances the ChatGPT web interface by adding a text export functionality. It allows users to easily copy or download the entire chat conversation, including both user and assistant messages, with proper formatting and real-time updates.
 
 ## Features
 
@@ -10,6 +10,7 @@ This Tampermonkey script enhances the ChatGPT web interface by adding a text exp
 - Dynamically updates the content of existing messages in real-time
 - Provides a user-friendly interface for selecting the chat container
 - Includes a "Copy Chat" button for quick export of the most up-to-date conversation
+- Offers a download option for saving the conversation as TXT or JSON
 - Persists chat container selection across page reloads
 - Adapts to URL changes within ChatGPT
 - Maintains proper formatting and line breaks in exported text
@@ -39,11 +40,15 @@ This Tampermonkey script enhances the ChatGPT web interface by adding a text exp
 
 4. Select the appropriate chat container from the dropdown menu
 
-5. Start or continue your ChatGPT conversation 
+5. If needed, click the clipboard icon next to the dropdown to copy the selected chat container selector to your clipboard
 
-6. Click the "Copy Chat" button to copy the entire conversation to your clipboard
+6. Start or continue your ChatGPT conversation 
 
-7. The script continuously updates the content of existing messages, ensuring that when you click "Copy Chat", you get the most current version of the conversation
+7. Click the "Copy Chat" button to copy the entire conversation to your clipboard
+
+8. Click the download icon next to the "Copy Chat" button to save the conversation as a TXT or JSON file
+
+9. The script continuously updates the content of existing messages, ensuring that when you copy or download the chat, you get the most current version of the conversation
 
 ## Configuration
 
