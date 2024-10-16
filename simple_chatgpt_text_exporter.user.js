@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.3
+// @version      3.4
 // @description  Logs chat ChatGPT messages with labels, dynamically updates, and includes a copy button. UI is centered at the top.
-// @match        *://*chatgpt.com/*
+// @match        https://chatgpt.com/*
 // @grant        none
 // @downloadURL  https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.user.js
 // @updateURL    https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.meta.js
@@ -16,14 +16,11 @@
 
     /***** Configuration *****/
     const CONFIG = {
-        // Set to true to enable console logging
         enableLogging: false,
-        // Hard-coded selector for the chat container (leave empty to auto-detect)
         chatContainerSelector: '',
     };
 
     /***** Variables *****/
-    const scannedMessages = new Set();
     let chatMessages = [];
     let observer = null;
     let lastUrl = location.href;
@@ -63,19 +60,19 @@
         });
 
         container.innerHTML = `
-            <div id="chat-selector-container" style="display:none;">
-                <label style="margin-right:5px;">Chat Container: </label>
-                <select id="chat-container-dropdown" style="background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; padding:2px 5px; font-size:12px;"></select>
-                <button id="copy-selector-button" style="margin-left:5px; padding:0 3px; font-size:10px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">📋</button>
-            </div>
-            <button id="toggle-selector-button" style="margin-right:10px; padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Select Chat</button>
-            <button id="copy-chat-button" style="padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">Copy Chat</button>
-            <div class="dropdown" style="display:inline-block; position:relative;">
-                <button id="download-chat-button" style="padding:2px 5px; font-size:12px; background-color:#fff; color:#000; border:1px solid #ccc; border-radius:3px; cursor:pointer;">⬇️</button>
-                <div class="dropdown-content" style="display:none; position:absolute; background-color:#f9f9f9; min-width:100px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2); z-index:1;">
-                    <a href="#" id="download-txt" style="color:black; padding:12px 16px; text-decoration:none; display:block;">Download TXT</a>
-                    <a href="#" id="download-json" style="color:black; padding:12px 16px; text-decoration:none; display:block;">Download JSON</a>
+            <button id="toggle-selector-button" style="margin-right:5px; padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">⚙️</button>
+            <div class="dropdown" style="display:inline-block; position:relative; margin-right:5px;">
+                <button id="download-chat-button" style="padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">⬇️</button>
+                <div class="dropdown-content" style="display:none; position:absolute; background-color:#1c1c1c; min-width:120px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.5); z-index:1; border-radius:3px; overflow:hidden;">
+                    <a href="#" id="download-txt" style="color:#fff; padding:8px 12px; text-decoration:none; display:block; font-size:12px; transition:background-color 0.3s;">Download TXT</a>
+                    <a href="#" id="download-json" style="color:#fff; padding:8px 12px; text-decoration:none; display:block; font-size:12px; transition:background-color 0.3s;">Download JSON</a>
                 </div>
+            </div>
+            <button id="copy-chat-button" style="margin-right:5px; padding:2px 5px; font-size:12px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">Copy Chat</button>
+            <div id="chat-selector-container" style="display:none; margin-right: 5px;">
+                <label style="margin-right:3px;">Chat Container: </label>
+                <select id="chat-container-dropdown" style="background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; padding:2px 5px; font-size:12px;"></select>
+                <button id="copy-selector-button" style="margin-left:3px; padding:0 3px; font-size:10px; background-color:#2c2c2c; color:#fff; border:1px solid #444; border-radius:3px; cursor:pointer;">📋</button>
             </div>
         `;
 
@@ -93,11 +90,19 @@
         document.addEventListener('click', closeDropdowns);
 
         populateDropdown(select);
+
+        // Add hover effect for dropdown items
+        const dropdownItems = container.querySelectorAll('.dropdown-content a');
+        dropdownItems.forEach(item => {
+            item.addEventListener('mouseover', () => item.style.backgroundColor = '#3c3c3c');
+            item.addEventListener('mouseout', () => item.style.backgroundColor = 'transparent');
+        });
     }
 
     function populateDropdown(select) {
+        const containers = findPossibleChatContainers();
         select.innerHTML = '<option value="">-- Select --</option>' +
-            findPossibleChatContainers().map(item =>
+            containers.map(item =>
                 `<option value="${item.selector}">${item.description}</option>`
             ).join('');
 
@@ -120,14 +125,18 @@
         const copyButton = document.getElementById('copy-chat-button');
         const chatContent = chatMessages.join('\n\n');
         if (chatContent.length > 0) {
-            navigator.clipboard.writeText(chatContent).then(() => {
-                showCopyStatus(copyButton, 'Copied!', '#4CAF50', '#fff');
-            }, () => {
-                showCopyStatus(copyButton, 'Failed to Copy', '#f44336', '#fff');
-            });
+            copyToClipboard(chatContent, copyButton);
         } else {
             showCopyStatus(copyButton, 'No Content', '#FFA500', '#fff');
         }
+    }
+
+    function copyToClipboard(text, button) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyStatus(button, 'Copied!', '#4CAF50', '#fff');
+        }, () => {
+            showCopyStatus(button, 'Failed to Copy', '#f44336', '#fff');
+        });
     }
 
     function showCopyStatus(button, message, bgColor, color) {
@@ -136,8 +145,8 @@
         button.style.color = color;
         setTimeout(() => {
             button.innerText = 'Copy Chat';
-            button.style.backgroundColor = '#fff';
-            button.style.color = '#000';
+            button.style.backgroundColor = '#2c2c2c';
+            button.style.color = '#fff';
         }, 2000);
     }
 
@@ -160,35 +169,19 @@
 
     function scanChatContent(container) {
         const messageElements = container.querySelectorAll('[data-message-author-role]');
-        let updatedMessages = [];
-
-        messageElements.forEach((el, index) => {
+        chatMessages = Array.from(messageElements).map(el => {
             const role = el.getAttribute('data-message-author-role');
             const textElement = el.querySelector('.text-message') || el;
             const text = textElement.innerText.trim();
+            return text ? `${role === 'user' ? 'You' : 'Assistant'} said:\n${text}` : null;
+        }).filter(Boolean);
 
-            if (text) {
-                let formattedMessage = `${role === 'user' ? 'You' : 'Assistant'} said:\n${text}`;
-                if (CONFIG.enableLogging) console.log(formattedMessage);
-
-                if (index < chatMessages.length) {
-                    // Update existing message
-                    updatedMessages.push(formattedMessage);
-                } else {
-                    // Add new message
-                    updatedMessages.push(formattedMessage);
-                }
-
-                scannedMessages.add(el);
-            }
-        });
-
-        // Update chatMessages with the new content
-        chatMessages = updatedMessages;
+        if (CONFIG.enableLogging) {
+            console.log(chatMessages);
+        }
     }
 
     function resetChatData() {
-        scannedMessages.clear();
         chatMessages = [];
         if (CONFIG.enableLogging) console.log('Chat data reset due to URL change');
     }
@@ -218,20 +211,14 @@
             'section'
         ];
 
-        const containers = new Map();
-        selectors.forEach(selector => {
-            document.querySelectorAll(selector).forEach(el => {
-                const uniqueSelector = getUniqueSelector(el);
-                if (!containers.has(uniqueSelector)) {
-                    containers.set(uniqueSelector, {
-                        selector: uniqueSelector,
-                        description: buildElementDescription(el, selector)
-                    });
-                }
-            });
-        });
-
-        return Array.from(containers.values());
+        return selectors.flatMap(selector =>
+            Array.from(document.querySelectorAll(selector)).map(el => ({
+                selector: getUniqueSelector(el),
+                description: buildElementDescription(el, selector)
+            }))
+        ).filter((item, index, self) =>
+            index === self.findIndex((t) => t.selector === item.selector)
+        );
     }
 
     function buildElementDescription(el, selector) {
@@ -250,9 +237,7 @@
         return el.tagName.toLowerCase();
     }
 
-    /***** Start Script *****/
-    window.addEventListener('load', init);
-
+    /***** UI Event Handlers *****/
     function toggleSelectorVisibility(event) {
         event.stopPropagation();
         const selectorContainer = document.getElementById('chat-selector-container');
@@ -260,39 +245,23 @@
     }
 
     function toggleDownloadOptions(event) {
-        event.stopPropagation(); // Prevent the click from immediately closing the dropdown
+        event.stopPropagation();
         const dropdownContent = document.querySelector('.dropdown-content');
         dropdownContent.style.display = dropdownContent.style.display === 'none' ? 'block' : 'none';
     }
 
     function closeDropdowns() {
-        const dropdowns = document.querySelectorAll('.dropdown-content');
-        dropdowns.forEach(dropdown => {
-            dropdown.style.display = 'none';
+        document.querySelectorAll('.dropdown-content, #chat-selector-container').forEach(el => {
+            el.style.display = 'none';
         });
-
-        const chatSelector = document.getElementById('chat-selector-container');
-        if (chatSelector) {
-            chatSelector.style.display = 'none';
-        }
     }
 
     function downloadChat(format) {
-        const content = chatMessages.join('\n\n');
-        let blob, filename;
-        
-        if (format === 'txt') {
-            blob = new Blob([content], {type: 'text/plain'});
-            filename = 'chat_export.txt';
-        } else if (format === 'json') {
-            const jsonContent = JSON.stringify(chatMessages, null, 2);
-            blob = new Blob([jsonContent], {type: 'application/json'});
-            filename = 'chat_export.json';
-        }
-
+        const content = format === 'json' ? JSON.stringify(chatMessages, null, 2) : chatMessages.join('\n\n');
+        const blob = new Blob([content], {type: format === 'json' ? 'application/json' : 'text/plain'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = filename;
+        a.download = `chat_export.${format}`;
         a.click();
         URL.revokeObjectURL(a.href);
     }
@@ -306,4 +275,16 @@
             alert('Failed to copy selector');
         });
     }
+
+    /***** Start Script *****/
+    window.addEventListener('load', init);
+
+    // Expose event handlers to the global scope
+    window.onSelectChange = onSelectChange;
+    window.onCopyButtonClick = onCopyButtonClick;
+    window.toggleSelectorVisibility = toggleSelectorVisibility;
+    window.toggleDownloadOptions = toggleDownloadOptions;
+    window.closeDropdowns = closeDropdowns;
+    window.downloadChat = downloadChat;
+    window.copySelectorToClipboard = copySelectorToClipboard;
 })();
