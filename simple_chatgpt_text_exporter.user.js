@@ -1,12 +1,14 @@
 // ==UserScript==
-// @name         Smiple ChatGPT text exporter
-// @namespace    https://chatgpt.com/
+// @name         Simple ChatGPT Text Exporter
+// @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
 // @version      3.3
 // @description  Logs chat ChatGPT messages with labels, dynamically updates, and includes a copy button. UI is centered at the top.
 // @match        *://*chatgpt.com/*
 // @grant        none
-// @downloadURL https://update.greasyfork.org/scripts/512815/Smiple%20ChatGPT%20text%20exporter.user.js
-// @updateURL https://update.greasyfork.org/scripts/512815/Smiple%20ChatGPT%20text%20exporter.meta.js
+// @downloadURL  https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.user.js
+// @updateURL    https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.meta.js
+// @homepage     https://github.com/samomar/Simple-ChatGPT-Text-Exporter
+// @supportURL   https://github.com/samomar/Simple-ChatGPT-Text-Exporter/issues
 // ==/UserScript==
 
 (function() {
@@ -278,7 +280,7 @@
     function downloadChat(format) {
         const content = chatMessages.join('\n\n');
         let blob, filename;
-
+        
         if (format === 'txt') {
             blob = new Blob([content], {type: 'text/plain'});
             filename = 'chat_export.txt';
