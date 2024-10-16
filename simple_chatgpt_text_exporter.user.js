@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.7
+// @version      3.8
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -9,55 +9,66 @@
 // @updateURL    https://greasyfork.org/scripts/512815-smiple-chatgpt-text-exporter/code/Smiple%20ChatGPT%20text%20exporter.meta.js
 // @homepage     https://github.com/samomar/Simple-ChatGPT-Text-Exporter
 // @supportURL   https://github.com/samomar/Simple-ChatGPT-Text-Exporter/issues
+// @license      MIT
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    /***** Configuration *****/
     const CONFIG = {
         enableLogging: false,
-        chatContainerSelector: '',
-        position: 'bottom' // Default to bottom (above input box)
+        chatContainerSelector: localStorage.getItem('chatContainerSelector') || '',
+        position: localStorage.getItem('chatLoggerPosition') || 'bottom'
     };
 
-    /***** Variables *****/
     let chatMessages = [];
     let observer = null;
     let lastUrl = location.href;
 
-    /***** Initialization *****/
     function init() {
         CONFIG.chatContainerSelector = localStorage.getItem('chatContainerSelector') || '';
         CONFIG.position = localStorage.getItem('chatLoggerPosition') || 'bottom';
 
-        // Use MutationObserver to detect DOM changes
-        const bodyObserver = new MutationObserver(() => {
-            if (document.querySelector('#chat-logger-controls')) return;
+        // Immediately try to create controls and observe chat
+        tryInitialize();
+
+        // Set up a MutationObserver to watch for DOM changes
+        const bodyObserver = new MutationObserver(tryInitialize);
+        bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Also set up an interval as a fallback
+        const initInterval = setInterval(() => {
+            if (document.getElementById('chat-logger-controls')) {
+                clearInterval(initInterval);
+            } else {
+                tryInitialize();
+            }
+        }, 1000);
+
+        // Continue checking for URL changes
+        setInterval(checkUrlChange, 1000);
+    }
+
+    function tryInitialize() {
+        if (!document.getElementById('chat-logger-controls')) {
             const inputBox = findInputBox();
             if (inputBox) {
                 createControls();
                 if (CONFIG.chatContainerSelector) {
                     observeChatContainer(CONFIG.chatContainerSelector);
+                } else {
+                    // If no selector is saved, try to find a suitable container
+                    const containers = findPossibleChatContainers();
+                    if (containers.length > 0) {
+                        CONFIG.chatContainerSelector = containers[0].selector;
+                        localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
+                        observeChatContainer(CONFIG.chatContainerSelector);
+                    }
                 }
             }
-        });
-
-        bodyObserver.observe(document.body, { childList: true, subtree: true });
-
-        // Initial creation of controls
-        const inputBox = findInputBox();
-        if (inputBox) {
-            createControls();
-            if (CONFIG.chatContainerSelector) {
-                observeChatContainer(CONFIG.chatContainerSelector);
-            }
         }
-
-        setInterval(checkUrlChange, 1000);
     }
 
-    /***** UI Creation *****/
     function createControls() {
         const existingControls = document.getElementById('chat-logger-controls');
         if (existingControls) existingControls.remove();
@@ -68,15 +79,15 @@
         updateControlsStyle(container);
 
         container.innerHTML = `
-            <button id="toggle-selector-button" class="chat-logger-btn">⚙️</button>
-            <div class="dropdown" style="display:inline-block; position:relative;">
+            <div class="dropdown">
                 <button id="download-chat-button" class="chat-logger-btn">⬇️</button>
-                <div class="dropdown-content" style="display:none; position:absolute; background-color:#1c1c1c; min-width:100px; box-shadow:0px 8px 16px 0px rgba(0,0,0,0.5); z-index:1; border-radius:4px; overflow:hidden; bottom:100%; left:0;">
-                    <a href="#" id="download-txt" class="dropdown-item">Download TXT</a>
-                    <a href="#" id="download-json" class="dropdown-item">Download JSON</a>
+                <div class="dropdown-content">
+                    <a href="#" id="download-txt">Download TXT</a>
+                    <a href="#" id="download-json">Download JSON</a>
                 </div>
             </div>
-            <button id="copy-chat-button" class="chat-logger-btn">Copy</button>
+            <button id="toggle-selector-button" class="chat-logger-btn">⚙️</button>
+            <button id="copy-chat-button" class="chat-logger-btn">Copy Chat</button>
             <button id="toggle-position-button" class="chat-logger-btn">↕️</button>
             <div id="chat-selector-container" style="display:none;">
                 <select id="chat-container-dropdown" class="chat-logger-select"></select>
@@ -86,38 +97,61 @@
 
         const style = document.createElement('style');
         style.textContent = `
+            #chat-logger-controls {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 5px;
+                background-color: #202123;
+                border-radius: 5px;
+            }
             .chat-logger-btn {
-                padding: 1px 3px;
-                font-size: 10px;
-                background-color: transparent;
+                padding: 5px 10px;
+                font-size: 12px;
+                background-color: #343541;
                 color: #fff;
                 border: none;
                 border-radius: 4px;
                 cursor: pointer;
-                margin: 0 1px;
             }
             .chat-logger-btn:hover {
-                background-color: rgba(255, 255, 255, 0.1);
+                background-color: #40414f;
             }
             .chat-logger-select {
-                background-color: transparent;
+                background-color: #343541;
                 color: #fff;
                 border: none;
                 border-radius: 4px;
-                padding: 1px 3px;
-                font-size: 10px;
-                margin: 0 1px;
+                padding: 5px;
+                font-size: 12px;
             }
-            .dropdown-item {
+            .dropdown {
+                position: relative;
+                display: inline-block;
+            }
+            .dropdown-content {
+                display: none;
+                position: absolute;
+                background-color: #202123;
+                min-width: 160px;
+                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+                z-index: 1;
+                border-radius: 4px;
+                top: 100%;
+                left: 0;
+            }
+            .dropdown-content a {
                 color: #fff;
-                padding: 4px 6px;
+                padding: 12px 16px;
                 text-decoration: none;
                 display: block;
-                font-size: 10px;
-                transition: background-color 0.3s;
+                font-size: 12px;
             }
-            .dropdown-item:hover {
-                background-color: #3c3c3c;
+            .dropdown-content a:hover {
+                background-color: #343541;
+            }
+            .dropdown:hover .dropdown-content {
+                display: block;
             }
         `;
         document.head.appendChild(style);
@@ -134,26 +168,8 @@
             }
         }
 
-        const select = document.getElementById('chat-container-dropdown');
-        select.addEventListener('change', onSelectChange);
-        document.getElementById('toggle-selector-button').addEventListener('click', toggleSelectorVisibility);
-        document.getElementById('copy-chat-button').addEventListener('click', onCopyButtonClick);
-        document.getElementById('download-chat-button').addEventListener('click', toggleDownloadOptions);
-        document.getElementById('download-txt').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('txt'); });
-        document.getElementById('download-json').addEventListener('click', (e) => { e.stopPropagation(); downloadChat('json'); });
-        document.getElementById('copy-selector-button').addEventListener('click', copySelectorToClipboard);
-        document.getElementById('toggle-position-button').addEventListener('click', togglePosition);
-
-        document.addEventListener('click', closeDropdowns);
-
-        populateDropdown(select);
-
-        // Add hover effect for dropdown items
-        const dropdownItems = container.querySelectorAll('.dropdown-content a');
-        dropdownItems.forEach(item => {
-            item.addEventListener('mouseover', () => item.style.backgroundColor = '#3c3c3c');
-            item.addEventListener('mouseout', () => item.style.backgroundColor = 'transparent');
-        });
+        populateDropdown();
+        addEventListeners();
     }
 
     function updateControlsStyle(container) {
@@ -189,78 +205,135 @@
         }
     }
 
+    function addEventListeners() {
+        document.getElementById('toggle-selector-button').addEventListener('click', toggleSelectorVisibility);
+        document.getElementById('download-chat-button').addEventListener('click', toggleDownloadOptions);
+        document.getElementById('download-txt').addEventListener('click', (e) => downloadChat(e, 'txt'));
+        document.getElementById('download-json').addEventListener('click', (e) => downloadChat(e, 'json'));
+        document.getElementById('copy-chat-button').addEventListener('click', copyChat);
+        document.getElementById('toggle-position-button').addEventListener('click', togglePosition);
+        document.getElementById('copy-selector-button').addEventListener('click', copySelectorToClipboard);
+        document.getElementById('chat-container-dropdown').addEventListener('change', onSelectChange);
+        document.addEventListener('click', closeDropdowns);
+    }
+
+    function toggleSelectorVisibility(event) {
+        event.stopPropagation();
+        const selectorContainer = document.getElementById('chat-selector-container');
+        selectorContainer.style.display = selectorContainer.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleDownloadOptions(event) {
+        event.stopPropagation();
+        const dropdownContent = document.querySelector('.dropdown-content');
+        dropdownContent.style.display = dropdownContent.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function copyChat(e) {
+        e.preventDefault();
+        const button = e.target;
+        const chatContent = chatMessages.join('\n\n');
+        if (chatContent) {
+            navigator.clipboard.writeText(chatContent).then(() => {
+                showTemporaryStatus(button, 'Copied!', '#4CAF50');
+            }).catch(() => {
+                showTemporaryStatus(button, 'Failed to Copy', '#f44336');
+            });
+        } else {
+            showTemporaryStatus(button, 'No Content', '#FFA500');
+        }
+    }
+
+    function downloadChat(e, format) {
+        e.preventDefault();
+        e.stopPropagation();
+        const content = format === 'json' ? JSON.stringify(chatMessages, null, 2) : chatMessages.join('\n\n');
+        const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `chat_export.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    }
+
     function togglePosition() {
         CONFIG.position = CONFIG.position === 'top' ? 'bottom' : 'top';
         localStorage.setItem('chatLoggerPosition', CONFIG.position);
         createControls(); // Recreate controls with new position
     }
 
-    function populateDropdown(select) {
-        const containers = findPossibleChatContainers();
-        select.innerHTML = '<option value="">-- Select --</option>' +
-            containers.map(item =>
-                `<option value="${item.selector}">${item.description}</option>`
-            ).join('');
-
-        if (CONFIG.chatContainerSelector) {
-            select.value = CONFIG.chatContainerSelector;
-        }
-    }
-
-    /***** Event Handlers *****/
-    function onSelectChange(event) {
-        CONFIG.chatContainerSelector = event.target.value;
-        localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
-        resetChatData();
-        if (CONFIG.chatContainerSelector) {
-            observeChatContainer(CONFIG.chatContainerSelector);
-        }
-    }
-
-    function onCopyButtonClick() {
-        const copyButton = document.getElementById('copy-chat-button');
-        const chatContent = chatMessages.join('\n\n');
-        if (chatContent.length > 0) {
-            copyToClipboard(chatContent, copyButton);
-        } else {
-            showCopyStatus(copyButton, 'No Content', '#FFA500', '#fff');
-        }
-    }
-
-    function copyToClipboard(text, button) {
-        navigator.clipboard.writeText(text).then(() => {
-            showCopyStatus(button, 'Copied!', '#4CAF50', '#fff');
-        }, () => {
-            showCopyStatus(button, 'Failed to Copy', '#f44336', '#fff');
+    function copySelectorToClipboard(e) {
+        e.preventDefault();
+        const select = document.getElementById('chat-container-dropdown');
+        navigator.clipboard.writeText(select.value).then(() => {
+            alert('Selector copied to clipboard!');
+        }).catch(() => {
+            alert('Failed to copy selector');
         });
     }
 
-    function showCopyStatus(button, message, bgColor, color) {
+    function onSelectChange(e) {
+        CONFIG.chatContainerSelector = e.target.value;
+        localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
+        resetChatData();
+        if (CONFIG.chatContainerSelector) {
+            observeChatContainer();
+        }
+    }
+
+    function showTemporaryStatus(button, message, bgColor) {
+        const originalText = button.innerText;
         button.innerText = message;
         button.style.backgroundColor = bgColor;
-        button.style.color = color;
+        button.style.color = '#fff';
         setTimeout(() => {
-            button.innerText = 'Copy Chat';
-            button.style.backgroundColor = '#2c2c2c';
+            button.innerText = originalText;
+            button.style.backgroundColor = 'transparent';
             button.style.color = '#fff';
         }, 2000);
     }
 
-    /***** Core Functions *****/
-    function observeChatContainer(selector) {
-        if (observer) observer.disconnect();
+    function closeDropdowns() {
+        document.querySelectorAll('.dropdown-content, #chat-selector-container').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
 
-        const findContainer = setInterval(() => {
-            const chatContainer = document.querySelector(selector);
-            if (chatContainer) {
-                clearInterval(findContainer);
-                resetChatData();
-                scanChatContent(chatContainer);
-
-                observer = new MutationObserver(() => scanChatContent(chatContainer));
-                observer.observe(chatContainer, { childList: true, subtree: true });
+    function checkUrlChange() {
+        if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            resetChatData();
+            if (CONFIG.chatContainerSelector) {
+                observeChatContainer();
             }
-        }, 500);
+        }
+    }
+
+    function resetChatData() {
+        chatMessages = [];
+        if (observer) observer.disconnect();
+    }
+
+    function observeChatContainer() {
+        if (observer) observer.disconnect();
+        const container = document.querySelector(CONFIG.chatContainerSelector);
+        if (container) {
+            scanChatContent(container);
+            observer = new MutationObserver(() => scanChatContent(container));
+            observer.observe(container, { childList: true, subtree: true });
+        } else {
+            const intervalId = setInterval(() => {
+                const container = document.querySelector(CONFIG.chatContainerSelector);
+                if (container) {
+                    clearInterval(intervalId);
+                    scanChatContent(container);
+                    observer = new MutationObserver(() => scanChatContent(container));
+                    observer.observe(container, { childList: true, subtree: true });
+                }
+            }, 500);
+        }
     }
 
     function scanChatContent(container) {
@@ -277,22 +350,15 @@
         }
     }
 
-    function resetChatData() {
-        chatMessages = [];
-        if (CONFIG.enableLogging) console.log('Chat data reset due to URL change');
+    function populateDropdown() {
+        const select = document.getElementById('chat-container-dropdown');
+        const options = findPossibleChatContainers();
+        select.innerHTML = '<option value="">-- Select --</option>' + options.map(opt =>
+            `<option value="${opt.selector}">${opt.description}</option>`
+        ).join('');
+        if (CONFIG.chatContainerSelector) select.value = CONFIG.chatContainerSelector;
     }
 
-    function checkUrlChange() {
-        if (location.href !== lastUrl) {
-            lastUrl = location.href;
-            resetChatData();
-            if (CONFIG.chatContainerSelector) {
-                observeChatContainer(CONFIG.chatContainerSelector);
-            }
-        }
-    }
-
-    /***** Utility Functions *****/
     function findPossibleChatContainers() {
         const selectors = [
             '[data-testid^="conversation-turn-"]',
@@ -304,7 +370,11 @@
             '[class*="chat"]',
             '[class*="message"]',
             'main',
-            'section'
+            'section',
+            // Add more general selectors that might contain the chat
+            'div[class*="conversation"]',
+            'div[class*="thread"]',
+            'div[class*="dialog"]'
         ];
 
         return selectors.flatMap(selector =>
@@ -317,97 +387,46 @@
         );
     }
 
-    function buildElementDescription(el, selector) {
-        let description = selector;
-        if (el.id) description += ` | #${el.id}`;
-        if (el.className) description += ` | .${el.className.trim().replace(/\s+/g, '.')}`;
-        return description;
-    }
-
     function getUniqueSelector(el) {
         if (el.id) return `#${el.id}`;
         if (el.className) {
-            const className = `.${el.className.trim().replace(/\s+/g, '.')}`;
+            const className = `.${[...el.classList].join('.')}`;
             return `${el.tagName.toLowerCase()}${className}`;
         }
         return el.tagName.toLowerCase();
     }
 
-    /***** UI Event Handlers *****/
-    function toggleSelectorVisibility(event) {
-        event.stopPropagation();
-        const selectorContainer = document.getElementById('chat-selector-container');
-        selectorContainer.style.display = selectorContainer.style.display === 'none' ? 'block' : 'none';
+    function buildElementDescription(el, selector) {
+        const description = [];
+        if (el.id) {
+            description.push(`#${el.id}`);
+        }
+        if (el.className) {
+            description.push(`.${[...el.classList].join('.')}`);
+        }
+        if (el.tagName) {
+            description.push(el.tagName.toLowerCase());
+        }
+        return description.join(' ');
     }
-
-    function toggleDownloadOptions(event) {
-        event.stopPropagation();
-        const dropdownContent = document.querySelector('.dropdown-content');
-        dropdownContent.style.display = dropdownContent.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function closeDropdowns() {
-        document.querySelectorAll('.dropdown-content, #chat-selector-container').forEach(el => {
-            el.style.display = 'none';
-        });
-    }
-
-    function downloadChat(format) {
-        const content = format === 'json' ? JSON.stringify(chatMessages, null, 2) : chatMessages.join('\n\n');
-        const blob = new Blob([content], {type: format === 'json' ? 'application/json' : 'text/plain'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `chat_export.${format}`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    }
-
-    function copySelectorToClipboard() {
-        const select = document.getElementById('chat-container-dropdown');
-        const selectorText = select.value;
-        navigator.clipboard.writeText(selectorText).then(() => {
-            alert('Selector copied to clipboard!');
-        }, () => {
-            alert('Failed to copy selector');
-        });
-    }
-
-    /***** Start Script *****/
-    window.addEventListener('load', init);
-
-    // Expose event handlers to the global scope
-    window.onSelectChange = onSelectChange;
-    window.onCopyButtonClick = onCopyButtonClick;
-    window.toggleSelectorVisibility = toggleSelectorVisibility;
-    window.toggleDownloadOptions = toggleDownloadOptions;
-    window.closeDropdowns = closeDropdowns;
-    window.downloadChat = downloadChat;
-    window.copySelectorToClipboard = copySelectorToClipboard;
-    window.togglePosition = togglePosition;
 
     function findInputBox() {
-        const possibleSelectors = [
+        const selectors = [
+            'textarea',
+            'div[contenteditable="true"]',
+            'input[type="text"]',
             'div.group.relative.flex.w-full.items-center',
             'form div.relative',
             'div[role="presentation"]',
             'div.flex.flex-col.w-full.py-2.flex-grow.md\\:py-3.md\\:pl-4',
-            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4',
-            // Add more selectors if needed
+            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4'
         ];
-
-        for (let selector of possibleSelectors) {
-            const element = document.querySelector(selector);
-            if (element) return element;
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) return el;
         }
-
-        // If no specific selector matches, try to find a general input area
-        const possibleInputAreas = document.querySelectorAll('div[class*="input"], div[class*="chat"], div[class*="message"]');
-        for (let area of possibleInputAreas) {
-            if (area.offsetHeight > 0 && area.offsetWidth > 0) {
-                return area;
-            }
-        }
-
         return null;
     }
+
+    window.addEventListener('load', init);
 })();
