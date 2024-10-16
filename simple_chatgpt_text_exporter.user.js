@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smiple ChatGPT text exporter
 // @namespace    https://chatgpt.com/
-// @version      3.1
+// @version      3.2
 // @description  Logs chat ChatGPT messages with labels, dynamically updates, and includes a copy button. UI is centered at the top.
 // @match        *://*chatgpt.com/*
 // @grant        none
