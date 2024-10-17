@@ -9,6 +9,8 @@ A Tampermonkey script that adds easy text export to the ChatGPT web interface.
 - Easy chat container selection
 - Supports TXT and JSON export formats
 - Adjustable control panel position (top/bottom)
+- Accurate content capture using network request interception
+- Reliable extraction of both user and assistant messages
 
 ## Installation
 
@@ -37,6 +39,7 @@ Here's a quick demonstration:
 - Refresh the page if the panel doesn't appear.
 - Try selecting a different chat container.
 - Check the browser console for error messages.
+- If chat content is not being captured, try disabling other browser extensions that might interfere with network requests.
 
 ## Contributing
 
