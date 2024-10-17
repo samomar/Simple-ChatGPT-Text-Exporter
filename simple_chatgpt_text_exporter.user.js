@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      3.9
+// @version      4.0
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -18,7 +18,7 @@
     const CONFIG = {
         enableLogging: false,
         chatContainerSelector: localStorage.getItem('chatContainerSelector') || '',
-        position: localStorage.getItem('chatLoggerPosition') || 'bottom'
+        position: localStorage.getItem('chatLoggerPosition') || 'top'
     };
 
     let chatMessages = [];
@@ -80,6 +80,7 @@
         updateControlsStyle(container);
 
         container.innerHTML = `
+            <button id="toggle-selector-button" class="chat-logger-btn">⚙️</button>
             <div class="dropdown">
                 <button id="download-chat-button" class="chat-logger-btn">⬇️</button>
                 <div class="dropdown-content">
@@ -87,12 +88,11 @@
                     <a href="#" id="download-json">Download JSON</a>
                 </div>
             </div>
-            <button id="toggle-selector-button" class="chat-logger-btn">⚙️</button>
             <button id="copy-chat-button" class="chat-logger-btn">Copy Chat</button>
-            <button id="toggle-position-button" class="chat-logger-btn">↕️</button>
             <div id="chat-selector-container" style="display:none;">
                 <select id="chat-container-dropdown" class="chat-logger-select"></select>
                 <button id="copy-selector-button" class="chat-logger-btn">📋</button>
+                <button id="toggle-position-button" class="chat-logger-btn">↕️</button>
             </div>
         `;
 
@@ -248,7 +248,7 @@
                 showTemporaryStatus(button, 'Failed to Copy', '#f44336');
             });
         } else {
-            showTemporaryStatus(button, 'No Content', '#FFA500');
+            showTemporaryStatus(button, 'Please wait for chat to load', '#FFA500');
         }
     }
 
