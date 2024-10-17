@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      4.1
+// @version      4.2
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -24,40 +24,36 @@
     let chatMessages = [];
     let observer = null;
     let lastUrl = location.href;
-    let initializationAttempts = 0;
-    const MAX_INITIALIZATION_ATTEMPTS = 20;
-    const INITIALIZATION_INTERVAL = 500; // 0.5 seconds
+    let chatData = null;
 
-    function init() {
-        initializationAttempts = 0;
-        resetChatData();
-        tryInitialize();
-    }
-
-    function tryInitialize() {
-        if (document.getElementById('chat-logger-controls')) return;
-
-        const inputBox = findInputBox();
-        const mainContent = document.querySelector('main');
-
-        if (inputBox || mainContent) {
-            createControls();
-            if (CONFIG.chatContainerSelector) {
-                observeChatContainer(CONFIG.chatContainerSelector);
-            } else {
-                const containers = findPossibleChatContainers();
-                if (containers.length > 0) {
-                    CONFIG.chatContainerSelector = containers[0].selector;
-                    localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
-                    observeChatContainer(CONFIG.chatContainerSelector);
+    // Intercept the network requests
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        return originalFetch.apply(this, args).then(async (response) => {
+            const url = response.url;
+            if (url.includes('conversation')) {
+                const clonedResponse = response.clone();
+                const jsonData = await clonedResponse.json();
+                if (jsonData.mapping) {
+                    chatData = jsonData;
+                    updateChatMessages();
                 }
             }
+            return response;
+        });
+    };
+
+    function init() {
+        resetChatData();
+        createControls();
+        if (CONFIG.chatContainerSelector) {
+            observeChatContainer(CONFIG.chatContainerSelector);
         } else {
-            initializationAttempts++;
-            if (initializationAttempts < MAX_INITIALIZATION_ATTEMPTS) {
-                setTimeout(tryInitialize, INITIALIZATION_INTERVAL);
-            } else {
-                console.warn('Failed to initialize ChatGPT Text Exporter after multiple attempts');
+            const containers = findPossibleChatContainers();
+            if (containers.length > 0) {
+                CONFIG.chatContainerSelector = containers[0].selector;
+                localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
+                observeChatContainer(CONFIG.chatContainerSelector);
             }
         }
     }
@@ -211,7 +207,10 @@
 
     function addEventListeners() {
         const controls = document.getElementById('chat-logger-controls');
-        controls.addEventListener('click', (e) => e.stopPropagation());
+        controls.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
 
         document.getElementById('toggle-selector-button').addEventListener('click', toggleSelectorVisibility);
         document.getElementById('download-chat-button').addEventListener('click', toggleDownloadOptions);
@@ -248,8 +247,9 @@
         }
 
         const chatContent = chatMessages.join('\n\n');
-        if (chatContent) {
-            button.dataset.active = 'true';
+        button.dataset.active = 'true';
+
+        if (chatContent.trim()) {
             navigator.clipboard.writeText(chatContent).then(() => {
                 showTemporaryStatus(button, 'Copied!', '#4CAF50');
             }).catch(() => {
@@ -263,14 +263,13 @@
                 }, 2000);
             });
         } else {
-            button.dataset.active = 'true';
             showTemporaryStatus(button, 'Please wait for chat to load', '#FFA500');
             // Revert to original state after the temporary message
             setTimeout(() => {
                 button.innerText = originalText;
                 button.style.backgroundColor = '';
                 button.dataset.active = 'false';
-            }, 500);
+            }, 2000);
         }
     }
 
@@ -329,7 +328,17 @@
     function checkUrlChange() {
         if (location.href !== lastUrl) {
             lastUrl = location.href;
+            resetCopyButton();
             init(); // Fully reinitialize on URL change
+        }
+    }
+
+    function resetCopyButton() {
+        const copyButton = document.getElementById('copy-chat-button');
+        if (copyButton) {
+            copyButton.innerText = 'Copy Chat';
+            copyButton.style.backgroundColor = '';
+            copyButton.dataset.active = 'false';
         }
     }
 
@@ -355,17 +364,33 @@
         }
     }
 
-    function scanChatContent(container) {
-        const messageElements = container.querySelectorAll('[data-message-author-role]');
+    function scanChatContent() {
+        updateChatMessages();
+    }
+
+    function updateChatMessages() {
+        if (!chatData || !chatData.mapping) return;
+
         const messages = [];
-        messageElements.forEach(el => {
-            const role = el.getAttribute('data-message-author-role');
-            const textElement = el.querySelector('.text-message') || el;
-            const text = textElement.innerText.trim();
-            if (text) {
-                messages.push(`${role === 'user' ? 'You' : 'Assistant'} said:\n${text}`);
-            }
+        const sortedNodes = Object.values(chatData.mapping).sort((a, b) => {
+            return (a.message?.create_time || 0) - (b.message?.create_time || 0);
         });
+
+        for (const node of sortedNodes) {
+            if (node.message && node.message.content && node.message.content.parts) {
+                const role = node.message.author.role;
+                const content = node.message.content.parts.join('\n');
+                if (content.trim()) {
+                    if (role === 'user') {
+                        messages.push(`You said:\n${content}`);
+                    } else if (role === 'assistant') {
+                        messages.push(`Assistant said:\n${content}`);
+                    }
+                    // Ignore system messages or other roles
+                }
+            }
+        }
+
         chatMessages = messages;
         if (CONFIG.enableLogging) {
             console.log(chatMessages);
