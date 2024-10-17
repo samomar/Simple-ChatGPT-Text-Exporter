@@ -28,6 +28,10 @@ A Tampermonkey script that adds easy text export to the ChatGPT web interface.
 4. Click "Copy Chat" or use the download options (⬇️) to export.
 5. Toggle panel position with the ↕️ button.
 
+Here's a quick demonstration:
+
+![Demo Video](https://raw.githubusercontent.com/samomar/Simple-ChatGPT-Text-Exporter/refs/heads/main/demo.gif)
+
 ## Troubleshooting
 
 - Refresh the page if the panel doesn't appear.
