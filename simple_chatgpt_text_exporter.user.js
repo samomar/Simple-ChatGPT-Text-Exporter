@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      4.0
+// @version      4.1
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -18,7 +18,7 @@
     const CONFIG = {
         enableLogging: false,
         chatContainerSelector: localStorage.getItem('chatContainerSelector') || '',
-        position: localStorage.getItem('chatLoggerPosition') || 'top'
+        position: localStorage.getItem('chatLoggerPosition') || 'bottom'
     };
 
     let chatMessages = [];
@@ -240,15 +240,37 @@
     function copyChat(e) {
         e.preventDefault();
         const button = e.target;
+        const originalText = button.innerText;
+
+        // If the button is already in an active state, do nothing
+        if (button.dataset.active === 'true') {
+            return;
+        }
+
         const chatContent = chatMessages.join('\n\n');
         if (chatContent) {
+            button.dataset.active = 'true';
             navigator.clipboard.writeText(chatContent).then(() => {
                 showTemporaryStatus(button, 'Copied!', '#4CAF50');
             }).catch(() => {
                 showTemporaryStatus(button, 'Failed to Copy', '#f44336');
+            }).finally(() => {
+                // Ensure the button always reverts to its original state
+                setTimeout(() => {
+                    button.innerText = originalText;
+                    button.style.backgroundColor = '';
+                    button.dataset.active = 'false';
+                }, 2000);
             });
         } else {
+            button.dataset.active = 'true';
             showTemporaryStatus(button, 'Please wait for chat to load', '#FFA500');
+            // Revert to original state after the temporary message
+            setTimeout(() => {
+                button.innerText = originalText;
+                button.style.backgroundColor = '';
+                button.dataset.active = 'false';
+            }, 500);
         }
     }
 
@@ -294,14 +316,8 @@
     }
 
     function showTemporaryStatus(button, message, bgColor) {
-        const originalText = button.innerText;
-        const originalBg = button.style.backgroundColor;
         button.innerText = message;
         button.style.backgroundColor = bgColor;
-        setTimeout(() => {
-            button.innerText = originalText;
-            button.style.backgroundColor = originalBg;
-        }, 2000);
     }
 
     function closeDropdowns() {
