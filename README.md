@@ -20,7 +20,13 @@ A Tampermonkey script that adds easy text export to the ChatGPT web interface.
    - [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
    - [Safari](https://apps.apple.com/us/app/tampermonkey/id1482490089)
 
-2. [Click here to install the script](https://github.com/samomar/Simple-ChatGPT-Text-Exporter/raw/refs/heads/main/simple_chatgpt_text_exporter.user.js).
+2. Install the script:
+   - [Click here to install from GitHub](https://github.com/samomar/Simple-ChatGPT-Text-Exporter/raw/refs/heads/main/simple_chatgpt_text_exporter.user.js)
+   - [Click here to install from Greasy Fork](https://greasyfork.org/en/scripts/462422-simple-chatgpt-text-exporter)
+
+## Privacy
+
+This script is 100% private. All operations occur locally in your browser, and no data is shared with any third parties. The script only interacts with the ChatGPT interface and your conversations remain strictly between you and OpenAI.
 
 ## Usage
 
