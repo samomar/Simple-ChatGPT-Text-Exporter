@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      4.2
+// @version      4.3
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -26,22 +26,60 @@
     let lastUrl = location.href;
     let chatData = null;
 
-    // Intercept the network requests
+    // Modify the original fetch interception to include streaming
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
         return originalFetch.apply(this, args).then(async (response) => {
             const url = response.url;
             if (url.includes('conversation')) {
                 const clonedResponse = response.clone();
-                const jsonData = await clonedResponse.json();
-                if (jsonData.mapping) {
-                    chatData = jsonData;
-                    updateChatMessages();
+
+                // Handle both streaming and non-streaming responses
+                if (response.headers.get('content-type').includes('text/event-stream')) {
+                    processStreamingResponse(clonedResponse);
+                } else {
+                    const jsonData = await clonedResponse.json();
+                    if (jsonData.mapping) {
+                        chatData = jsonData;
+                        updateChatMessages();
+                    }
                 }
             }
             return response;
         });
     };
+
+    // Add this new function for streaming updates
+    async function processStreamingResponse(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const jsonData = JSON.parse(line.slice(6));
+                        if (jsonData.message) {
+                            // Update chatData with the new message
+                            if (!chatData) chatData = { mapping: {} };
+                            chatData.mapping[jsonData.message.id] = { message: jsonData.message };
+                            updateChatMessages();
+                        }
+                    } catch (error) {
+                        // Error parsing JSON
+                    }
+                }
+            }
+        }
+    }
 
     function init() {
         resetChatData();
@@ -463,24 +501,6 @@
         }
         description.push(el.tagName.toLowerCase());
         return description.join(' ');
-    }
-
-    function findInputBox() {
-        const selectors = [
-            'textarea',
-            'div[contenteditable="true"]',
-            'input[type="text"]',
-            'div.group.relative.flex.w-full.items-center',
-            'form div.relative',
-            'div[role="presentation"]',
-            'div.flex.flex-col.w-full.py-2.flex-grow.md\\:py-3.md\\:pl-4',
-            'div.flex.flex-col.w-full.py-[10px].flex-grow.md\\:py-4.md\\:pl-4'
-        ];
-        for (const sel of selectors) {
-            const el = document.querySelector(sel);
-            if (el) return el;
-        }
-        return null;
     }
 
     // Set up observers for page changes
