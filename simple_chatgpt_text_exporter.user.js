@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Simple ChatGPT Text Exporter
 // @namespace    https://github.com/samomar/Simple-ChatGPT-Text-Exporter
-// @version      4.3
+// @version      4.2
 // @description  Logs ChatGPT messages with labels, dynamically updates, and includes a copy button. UI can be positioned at the top center or above the input box.
 // @match        https://chatgpt.com/*
 // @grant        none
@@ -26,9 +26,39 @@
     let lastUrl = location.href;
     let chatData = null;
 
-    // Modify the original fetch interception to include streaming
+    // Modify the original fetch interception to include streaming and outgoing requests
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
+        const [resource, config] = args;
+        const method = (config && config.method) || 'GET';
+        
+        // Check if the request is a POST to the conversation endpoint
+        if (method.toUpperCase() === 'POST' && resource.includes('/conversation')) {
+            // Clone the request to read its body
+            const clonedRequest = config.body ? new Request(resource, config) : null;
+
+            if (clonedRequest) {
+                clonedRequest.clone().json().then(parsedBody => {
+                    if (parsedBody && parsedBody.messages && Array.isArray(parsedBody.messages)) {
+                        const userMessageParts = parsedBody.messages[0]?.content?.parts;
+                        if (userMessageParts && Array.isArray(userMessageParts)) {
+                            const userMessage = userMessageParts.join('\n');
+                            if (userMessage.trim()) {
+                                chatMessages.push(`You said:\n${userMessage}`);
+                                if (CONFIG.enableLogging) {
+                                    console.log(`Captured User Message: ${userMessage}`);
+                                }
+                            }
+                        }
+                    }
+                }).catch(error => {
+                    if (CONFIG.enableLogging) {
+                        console.error('Error parsing outgoing request body:', error);
+                    }
+                });
+            }
+        }
+
         return originalFetch.apply(this, args).then(async (response) => {
             const url = response.url;
             if (url.includes('conversation')) {
@@ -93,6 +123,13 @@
                 localStorage.setItem('chatContainerSelector', CONFIG.chatContainerSelector);
                 observeChatContainer(CONFIG.chatContainerSelector);
             }
+        }
+
+        // Add listener for outgoing messages if not already added
+        if (!window.outgoingMessageListenerAdded) {
+            window.outgoingMessageListenerAdded = true;
+            // This ensures that the fetch override is already in place
+            // and user messages are captured
         }
     }
 
@@ -423,6 +460,12 @@
                         messages.push(`You said:\n${content}`);
                     } else if (role === 'assistant') {
                         messages.push(`Assistant said:\n${content}`);
+                    }
+                    // Handle attachments if enabled
+                    if (CONFIG.includeAttachments && node.message.attachments && node.message.attachments.length > 0) {
+                        node.message.attachments.forEach(attachment => {
+                            messages.push(`Attachment: ${attachment.url}`);
+                        });
                     }
                     // Ignore system messages or other roles
                 }
