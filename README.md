@@ -22,7 +22,7 @@ A Tampermonkey script that adds easy text export to the ChatGPT web interface.
 
 2. Install the script:
    - [Click here to install from GitHub](https://github.com/samomar/Simple-ChatGPT-Text-Exporter/raw/refs/heads/main/simple_chatgpt_text_exporter.user.js)
-   - [Click here to install from Greasy Fork](https://greasyfork.org/en/scripts/462422-simple-chatgpt-text-exporter)
+   - [Click here to install from Greasy Fork](https://greasyfork.org/en/scripts/512815-simple-chatgpt-text-exporter)
 
 ## Privacy
 
